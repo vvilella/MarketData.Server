@@ -160,12 +160,12 @@ namespace MarketData.Server
             timer.Stop();
 
             var clients = followers["PETR4"];
-            var date = DateTime.Now;
-            var price = "12.52";
+
+            var priceChange = new Model.ChangePriceModel() { Symbol = "PETR4", Price = 12.52, Date = DateTime.Now };
 
             foreach (var item in clients)
             {
-                server.sendMessageToClient(item, $"{Server.END_LINE}SYMBOL: PETR4 - DATE: {date.ToString("yyyy-MM-dd HH:mm:ss:FFF")} - PRICE: {price}");
+                server.sendMessageToClient(item, Server.END_LINE + $"{priceChange.ToString()}");
             }
 
             schedule_Timer();
