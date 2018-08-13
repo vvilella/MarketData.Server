@@ -1,8 +1,11 @@
-﻿using System;
+﻿using MarketData.Server.Model;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Net;
-using System.Threading;
 using System.Timers;
+using System.Linq;
 
 namespace MarketData.Server
 {
@@ -11,9 +14,15 @@ namespace MarketData.Server
         private static Server server;
         private static Dictionary<String, List<Client>> followers = new Dictionary<string, List<Client>>();
         private static System.Timers.Timer timer;
+        private static List<ChangePriceModel> ticks = new List<ChangePriceModel>();
+        private static DateTime currentDate = DateTime.ParseExact("10/08/2018 10:07:00", "dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
 
         static void Main(string[] args)
         {
+            loadPrices();
+            schedule_Timer();
+
+
             server = new Server(IPAddress.Any);
             server.ClientConnected += clientConnected;
             server.ClientDisconnected += clientDisconnected;
@@ -34,6 +43,36 @@ namespace MarketData.Server
             } while ((read = Console.ReadKey(true).KeyChar) != 'q');
 
             server.stop();
+        }
+
+        private static void loadPrices()
+        {
+            using (var reader = new StreamReader(@"C:\victor\git\tradingBR\MarketData.Server\csv\PETR4_201808101007_201808101654.csv"))
+            {
+                while (!reader.EndOfStream)
+                {
+                    var values = reader.ReadLine().Split(';');
+
+                    var date = DateTime.ParseExact(values[0] + values[1], "yyyy.MM.ddHH:mm:ss.fff", CultureInfo.InvariantCulture);
+
+                    Double? ask = String.IsNullOrEmpty(values[2]) ? 0 : Double.Parse(values[2], CultureInfo.InvariantCulture);
+                    Double? bid = String.IsNullOrEmpty(values[3]) ? 0 : Double.Parse(values[3], CultureInfo.InvariantCulture);
+                    Double? last = String.IsNullOrEmpty(values[4]) ? 0 : Double.Parse(values[4], CultureInfo.InvariantCulture);
+                    Int32? volume = String.IsNullOrEmpty(values[5]) ? 0 : Int32.Parse(values[5], CultureInfo.InvariantCulture);
+
+                    var tick = new ChangePriceModel()
+                    {
+                        Symbol = "PETR4",
+                        Date = date,
+                        Ask = ask,
+                        Bid = bid,
+                        Last = last,
+                        Volume = volume
+                    };
+
+                    ticks.Add(tick);
+                }
+            }
         }
 
         private static void clientConnected(Client client)
@@ -89,8 +128,6 @@ namespace MarketData.Server
 
         private static void addFollower(string symbol, Client client)
         {
-            schedule_Timer();
-
             if (followers.ContainsKey(symbol))
             {
                 followers[symbol].Add(client);
@@ -149,26 +186,28 @@ namespace MarketData.Server
 
         static void schedule_Timer()
         {
-            double tickTime = 2300;
-            timer = new System.Timers.Timer(tickTime);
+            double tickTime = 1000;
+            timer = new Timer(tickTime);
             timer.Elapsed += new ElapsedEventHandler(timer_Elapsed);
             timer.Start();
         }
 
         static void timer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            timer.Stop();
+            Console.WriteLine(currentDate);
+            currentDate = currentDate.AddMilliseconds(1000);
 
-            var clients = followers["PETR4"];
+            var selectedTicks = ticks.Where(i => i.Date.Equals(currentDate)).ToList();
 
-            var priceChange = new Model.ChangePriceModel() { Symbol = "PETR4", Price = 12.52, Date = DateTime.Now };
-
-            foreach (var item in clients)
+            if (selectedTicks.Count > 0)
             {
-                server.sendMessageToClient(item, Server.END_LINE + $"{priceChange.ToString()}");
-            }
+                var clients = followers["PETR4"];
 
-            schedule_Timer();
+                foreach (var item in clients)
+                {
+                    selectedTicks.ForEach(i => server.sendMessageToClient(item, Server.END_LINE + $"{i.ToString()}"));
+                }
+            }
         }
     }
 }
