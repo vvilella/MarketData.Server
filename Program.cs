@@ -13,15 +13,13 @@ namespace MarketData.Server
     {
         private static Server server;
         private static Dictionary<String, List<Client>> followers = new Dictionary<string, List<Client>>();
-        private static System.Timers.Timer timer;
+        private static Timer timer;
         private static List<ChangePriceModel> ticks = new List<ChangePriceModel>();
-        private static DateTime currentDate = DateTime.ParseExact("10/08/2018 10:07:00", "dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+        private static DateTime currentDate = DateTime.MinValue;
 
         static void Main(string[] args)
         {
             loadPrices();
-            schedule_Timer();
-
 
             server = new Server(IPAddress.Any);
             server.ClientConnected += clientConnected;
@@ -114,16 +112,39 @@ namespace MarketData.Server
             }
             else if (message.StartsWith("follow"))
             {
-                var symbol = extractSymbol(message);
-
-                if (isValidSymbol(symbol))
-                {
-                    addFollower(symbol, client);
-                    server.sendMessageToClient(client, Server.END_LINE + "Seguindo: " + symbol);
-                }
+                follow(client, message);
+            }
+            else if (message.StartsWith("setdate"))
+            {
+                setDate(message);
+                server.sendMessageToClient(client, Server.END_LINE + $"New current date: {currentDate.ToString("dd/MM/yyyy HH:mm")}" + Server.END_LINE);
             }
 
             server.sendMessageToClient(client, Server.END_LINE + Server.CURSOR);
+        }
+
+        private static void setDate(string message)
+        {
+            var date = DateTime.MinValue;
+            var datePart = message.Split(' ');
+
+            if(datePart.Length == 2 
+                && DateTime.TryParseExact(datePart[1], "dd/MM/yyyy-HH:mm", CultureInfo.InvariantCulture,DateTimeStyles.None, out date))
+            {
+                currentDate = date;
+                startTimer();
+            }
+        }
+
+        private static void follow(Client client, string message)
+        {
+            var symbol = extractSymbol(message);
+
+            if (isValidSymbol(symbol))
+            {
+                addFollower(symbol, client);
+                server.sendMessageToClient(client, Server.END_LINE + "Seguindo: " + symbol);
+            }
         }
 
         private static void addFollower(string symbol, Client client)
@@ -184,7 +205,7 @@ namespace MarketData.Server
             }
         }
 
-        static void schedule_Timer()
+        static void startTimer()
         {
             double tickTime = 1000;
             timer = new Timer(tickTime);
@@ -199,7 +220,7 @@ namespace MarketData.Server
 
             var selectedTicks = ticks.Where(i => i.Date.Equals(currentDate)).ToList();
 
-            if (selectedTicks.Count > 0)
+            if (selectedTicks.Count > 0 && followers.ContainsKey("PETR4"))
             {
                 var clients = followers["PETR4"];
 
