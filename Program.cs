@@ -45,7 +45,7 @@ namespace MarketData.Server
 
         private static void loadPrices()
         {
-            using (var reader = new StreamReader(@"C:\victor\git\tradingBR\MarketData.Server\csv\PETR4_201808101007_201808101654.csv"))
+            using (var reader = new StreamReader(@"C:\victor\git\tradingBR\MarketData.Server\csv\PETR4_201808101007_201808101655.csv"))
             {
                 while (!reader.EndOfStream)
                 {
